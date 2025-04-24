@@ -6,7 +6,6 @@ read
 
 echo "Quantos pacientes você deseja processar? (ou digite 'exit' para sair)"
 read N
-
 if [[ "$N" == "exit" ]]; then exec bash; fi
 if ! [[ "$N" =~ ^[0-9]+$ ]]; then
   echo "❌ Valor inválido. Digite apenas um número inteiro."
@@ -16,7 +15,6 @@ fi
 TOTAL_FILES=$((N * 2))
 echo "Isso corresponde a $TOTAL_FILES arquivos (R1 e R2 por paciente). Está correto? (yes/no ou 'exit')"
 read CONFIRM_TOTAL
-
 if [[ "$CONFIRM_TOTAL" == "exit" ]]; then exec bash; fi
 if [[ "$CONFIRM_TOTAL" != "yes" ]]; then
   echo "Encerrando o script. Verifique as informações antes de prosseguir."
@@ -25,7 +23,6 @@ fi
 
 echo "Todos os arquivos estão no mesmo diretório? (yes/no ou 'exit')"
 read SAME_DIR
-
 if [[ "$SAME_DIR" == "exit" ]]; then exec bash; fi
 if [[ "$SAME_DIR" != "yes" ]]; then
   echo "Por favor, consolide todos os arquivos em um único diretório antes de continuar."
@@ -34,7 +31,6 @@ fi
 
 echo "Informe o caminho completo do diretório com os arquivos (sem barra ao final, ou digite 'exit' para sair):"
 read INPUT_DIR
-
 if [[ "$INPUT_DIR" == "exit" ]]; then exec bash; fi
 if [[ ! -d "$INPUT_DIR" ]]; then
   echo "Erro: diretório '$INPUT_DIR' não encontrado."
@@ -46,7 +42,6 @@ find "$INPUT_DIR" -maxdepth 1 -type f \( -name "*.fastq" -o -name "*.fastq.gz" \
 
 echo "Deseja processar todos os arquivos listados acima? (yes/no ou 'exit')"
 read PROCESS_ALL
-
 if [[ "$PROCESS_ALL" == "exit" ]]; then exec bash; fi
 
 if [[ "$PROCESS_ALL" != "yes" ]]; then
@@ -65,7 +60,6 @@ mkdir -p "$OUTPUT_DIR"
 echo "Os arquivos serão salvos em: $OUTPUT_DIR"
 echo "Deseja continuar? (yes/no ou 'exit')"
 read CONTINUE
-
 if [[ "$CONTINUE" == "exit" ]]; then exec bash; fi
 if [[ "$CONTINUE" != "yes" ]]; then
   echo "Processo cancelado."
@@ -84,7 +78,6 @@ echo "O servidor possui $TOTAL_CPUS threads disponíveis."
 echo "⚠️ Sugerimos até $SAFE_CPUS threads para evitar impacto em outros usuários."
 echo "Quantas threads deseja usar? (ou 'exit')"
 read THREADS
-
 if [[ "$THREADS" == "exit" ]]; then exec bash; fi
 if ! [[ "$THREADS" =~ ^[0-9]+$ ]]; then
   echo "Valor inválido para threads."
@@ -96,10 +89,26 @@ echo "Este script normalmente roda com ~${DEFAULT_RAM_GB}GB de RAM."
 echo "🧠 O servidor possui $TOTAL_RAM_GB GB. Sugerimos até ${SUGGESTED_RAM_GB}GB."
 echo "Quanto de RAM deseja alocar (GB)? (ou 'exit')"
 read RAM
-
 if [[ "$RAM" == "exit" ]]; then exec bash; fi
 if ! [[ "$RAM" =~ ^[0-9]+$ ]]; then
   echo "Valor inválido para RAM."
+  exec bash
+fi
+
+# Pergunta sobre uso de --user
+echo ""
+echo "Deseja rodar o Docker com um usuário específico (--user UID)?"
+echo "Digite o UID desejado (ex: 1006), ou 'no' para continuar normalmente:"
+read CUSTOM_UID
+if [[ "$CUSTOM_UID" == "exit" ]]; then exec bash; fi
+if [[ "$CUSTOM_UID" =~ ^[0-9]+$ ]]; then
+  USE_USER="--user $CUSTOM_UID"
+  echo "Docker será executado com: $USE_USER"
+elif [[ "$CUSTOM_UID" == "no" ]]; then
+  USE_USER=""
+  echo "Docker será executado com usuário padrão (root dentro do container)."
+else
+  echo "❌ Entrada inválida. Digite um número de UID ou 'no'."
   exec bash
 fi
 
@@ -115,10 +124,10 @@ done
 echo ""
 echo "⚙️  Threads: $THREADS"
 echo "🧠 RAM (informativo): $RAM GB"
+echo "🔐 Docker UID: ${CUSTOM_UID}"
 echo "================================"
 echo "Podemos começar? (yes/no ou 'exit')"
 read FINAL_CONFIRM
-
 if [[ "$FINAL_CONFIRM" == "exit" ]]; then exec bash; fi
 if [[ "$FINAL_CONFIRM" != "yes" ]]; then
   echo "Execução cancelada."
@@ -138,6 +147,7 @@ while [[ $i -lt ${#FILES[@]} ]]; do
 
   docker run --rm \
     -v "$INPUT_DIR":/data \
+    $USE_USER \
     biowardrobe2/trimgalore:v0.4.4 \
     trim_galore --paired "/data/$R1" "/data/$R2" -o "/data/arquivos_trimados_$TIMESTAMP"
 
