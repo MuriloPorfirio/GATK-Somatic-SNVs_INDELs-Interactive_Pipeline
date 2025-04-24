@@ -1,4 +1,4 @@
-# 🧬 PDX Pipeline – Pré-processamento de FASTQ
+PDX Pipeline – Pré-processamento de FASTQ
 
 Este repositório contém scripts em Bash para o pré-processamento de dados de sequenciamento genômico (FASTQ) em amostras de PDX (Patient-Derived Xenograft). As etapas envolvem **concatenação**, **trimagem** e **análise de qualidade**, todas executadas em ambiente Docker para garantir reprodutibilidade.
 
