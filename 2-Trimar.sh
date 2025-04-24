@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "⚠️  Script iniciado."
+echo "Script iniciado."
 echo "Se você colou este script no terminal, pressione Enter para continuar (isso evita execução automática acidental)."
 read
 
@@ -8,7 +8,7 @@ echo "Quantos pacientes você deseja processar? (ou digite 'exit' para sair)"
 read N
 if [[ "$N" == "exit" ]]; then exec bash; fi
 if ! [[ "$N" =~ ^[0-9]+$ ]]; then
-  echo "❌ Valor inválido. Digite apenas um número inteiro."
+  echo "Valor inválido. Digite apenas um número inteiro."
   exec bash
 fi
 
@@ -75,7 +75,7 @@ SUGGESTED_RAM_GB=$((TOTAL_RAM_GB / 2))
 
 echo ""
 echo "O servidor possui $TOTAL_CPUS threads disponíveis."
-echo "⚠️ Sugerimos até $SAFE_CPUS threads para evitar impacto em outros usuários."
+echo "Sugerimos até $SAFE_CPUS threads para evitar impacto em outros usuários."
 echo "Quantas threads deseja usar? (ou 'exit')"
 read THREADS
 if [[ "$THREADS" == "exit" ]]; then exec bash; fi
@@ -85,8 +85,8 @@ if ! [[ "$THREADS" =~ ^[0-9]+$ ]]; then
 fi
 
 echo ""
-echo "Este script normalmente roda com ~${DEFAULT_RAM_GB}GB de RAM."
-echo "🧠 O servidor possui $TOTAL_RAM_GB GB. Sugerimos até ${SUGGESTED_RAM_GB}GB."
+echo "Este script normalmente roda com cerca de ${DEFAULT_RAM_GB}GB de RAM."
+echo "O servidor possui $TOTAL_RAM_GB GB. Sugerimos até ${SUGGESTED_RAM_GB}GB."
 echo "Quanto de RAM deseja alocar (GB)? (ou 'exit')"
 read RAM
 if [[ "$RAM" == "exit" ]]; then exec bash; fi
@@ -108,23 +108,23 @@ elif [[ "$CUSTOM_UID" == "no" ]]; then
   USE_USER=""
   echo "Docker será executado com usuário padrão (root dentro do container)."
 else
-  echo "❌ Entrada inválida. Digite um número de UID ou 'no'."
+  echo "Entrada inválida. Digite um número de UID ou 'no'."
   exec bash
 fi
 
 # Resumo final
 echo ""
 echo "========= RESUMO FINAL ========="
-echo "📁 Diretório de entrada: $INPUT_DIR"
-echo "📂 Diretório de saída: $OUTPUT_DIR"
-echo "📄 Arquivos a processar:"
+echo "Diretório de entrada: $INPUT_DIR"
+echo "Diretório de saída: $OUTPUT_DIR"
+echo "Arquivos a processar:"
 for file in "${FILES[@]}"; do
   echo "- $file"
 done
 echo ""
-echo "⚙️  Threads: $THREADS"
-echo "🧠 RAM (informativo): $RAM GB"
-echo "🔐 Docker UID: ${CUSTOM_UID}"
+echo "Threads: $THREADS"
+echo "RAM (informativo): $RAM GB"
+echo "Docker UID: ${CUSTOM_UID}"
 echo "================================"
 echo "Podemos começar? (yes/no ou 'exit')"
 read FINAL_CONFIRM
@@ -152,15 +152,15 @@ while [[ $i -lt ${#FILES[@]} ]]; do
     trim_galore --paired "/data/$R1" "/data/$R2" -o "/data/arquivos_trimados_$TIMESTAMP"
 
   if [[ $? -ne 0 ]]; then
-    echo "⚠️ Erro ao processar: $R1 e $R2"
+    echo "Erro ao processar: $R1 e $R2"
   else
-    echo "✅ Concluído: $R1 e $R2"
+    echo "Concluído: $R1 e $R2"
   fi
 
   i=$((i + 2))
 done
 
 echo "------------------------------------------------------"
-echo "✅ Processo de trimagem finalizado."
-echo "📁 Resultados em: $OUTPUT_DIR"
+echo "Processo de trimagem finalizado."
+echo "Resultados em: $OUTPUT_DIR"
 exec bash
