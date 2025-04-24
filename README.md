@@ -1,6 +1,6 @@
-PDX Pipeline – Pré-processamento de FASTQ
+#  PDX Pipeline – Pré-processamento de FASTQ
 
-Este repositório contém scripts em Bash para o pré-processamento de dados de sequenciamento genômico (FASTQ) em amostras de PDX (Patient-Derived Xenograft). As etapas envolvem **concatenação**, **trimagem** e **análise de qualidade**, todas executadas em ambiente Docker para garantir reprodutibilidade.
+Este repositório contém scripts em Bash para o pré-processamento de dados de sequenciamento genômico (FASTQ).
 
 ---
 
@@ -41,36 +41,7 @@ Todos os scripts deste repositório são **interativos**, com diversas perguntas
 
 > Uma inversão nessa ordem pode afetar a qualidade da análise ou gerar erros silenciosos.
 
----
-
-## 📜 Scripts incluídos
-
-Os scripts seguem esta ordem lógica:
-
-1. `1_concatenar_fastq.sh`  
-   Junta arquivos de múltiplas lanes (L001, L002) por paciente, gerando um único R1 e R2.
-
-2. `2_trimar_fastq.sh`  
-   Realiza trimming com `Trim Galore` dentro do Docker. Pergunta por RAM, threads e UID.
-
-3. `3_qualidade_fastq.sh`  
-   Avalia qualidade com `FastQC` individual e `MultiQC` conjunto por paciente.
-
----
-
-## 🐳 Docker
-
-Todos os scripts dependem de imagens Docker específicas. O script verifica automaticamente se estão presentes:
-
-- `biowardrobe2/trimgalore:v0.4.4`
-- `biocontainers/fastqc:v0.11.9_cv8`
-- `ewels/multiqc`
-
-Caso estejam ausentes, o script orienta como instalar.
-
----
-
-## ✅ Boas práticas
+## Boas práticas
 
 - Nomeie os arquivos com padrão claro (`_R1_`, `_R2_`, `_val_1`, `_val_2`)
 - Execute os scripts **na ordem correta**
@@ -80,8 +51,6 @@ Caso estejam ausentes, o script orienta como instalar.
 
 ---
 
-## ✍️ Autor
-
-**Murilo Porfírio de Aguiar**  
-Pesquisador @ Biomafia  
-📧 murilo.aguiar[at]instituto.bio.br
+## Autor
+Murilo Porfírio de Aguiar e GPT
+murilo.porfirio@yahoo.com
