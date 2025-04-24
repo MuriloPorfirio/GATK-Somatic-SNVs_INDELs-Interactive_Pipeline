@@ -1,4 +1,4 @@
-#  PDX Pipeline – Pré-processamento de FASTQ
+#  Pipeline para SNVs e INDELs – Processamento de FASTQs provindos de Illumina NGS
 
 Este repositório contém scripts em Bash para o pré-processamento de dados de sequenciamento genômico (FASTQ).
 
