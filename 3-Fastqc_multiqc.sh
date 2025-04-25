@@ -53,7 +53,7 @@ else
 fi
 
 echo ""
-echo "Informe o caminho do diretório com os arquivos *_val_1.fq.gz e *_val_2.fq.gz (ou digite 'exit' para sair):"
+echo "Informe o caminho do diretório com os arquivos *_R1_001.fastq.gz* e *_R2_001.fastq.gz* (ou digite 'exit' para sair):"
 read INPUT_DIR
 if [[ "$INPUT_DIR" == "exit" ]]; then exec bash; fi
 if [[ ! -d "$INPUT_DIR" ]]; then
