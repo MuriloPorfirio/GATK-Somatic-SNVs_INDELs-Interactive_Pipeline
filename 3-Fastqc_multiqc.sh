@@ -94,10 +94,14 @@ declare -A PATIENTS
 
 for FILE in "${FILES[@]}"; do
   if [[ "$FILE" == *_val_1.fq.gz ]]; then
+  #ID="${FILE%_S1_L001_R1_001.fastq.gz}"
+  #ID="${FILE%_S1_L001_R1_00$[0-9].fastq.gz}"
     ID="${FILE%_val_1.fq.gz}"
     PATIENTS["$ID,R1"]="$FILE"
   elif [[ "$FILE" == *_val_2.fq.gz ]]; then
     ID="${FILE%_val_2.fq.gz}"
+  #ID="${FILE%_S1_L001_R2_001.fastq.gz}"
+  #ID="${FILE%_S1_L001_R2_00$[0-9].fastq.gz}"
     PATIENTS["$ID,R2"]="$FILE"
   fi
 done
