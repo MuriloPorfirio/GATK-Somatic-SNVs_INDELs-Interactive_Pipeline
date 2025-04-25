@@ -163,4 +163,29 @@ done
 echo "------------------------------------------------------"
 echo "Processo de trimagem finalizado."
 echo "Resultados em: $OUTPUT_DIR"
+echo "------------------------------------------------------"
+
+# Rodar FastQC nos arquivos trimados (opcional)
+echo ""
+echo "Deseja rodar FastQC nos arquivos trimados agora? (yes/no ou 'exit')"
+read QC_CONFIRM
+if [[ "$QC_CONFIRM" == "exit" ]]; then exec bash; fi
+
+if [[ "$QC_CONFIRM" == "yes" ]]; then
+  echo "Executando FastQC nos arquivos trimados..."
+  docker run --rm \
+    -v "$OUTPUT_DIR":/data \
+    biocontainers/fastqc:v0.11.9_cv8 \
+    bash -c "fastqc -o /data /data/*_val_1.fq.gz /data/*_val_2.fq.gz"
+
+  if [[ $? -ne 0 ]]; then
+    echo "Houve um erro durante a execução do FastQC."
+  else
+    echo "FastQC finalizado com sucesso. Relatórios estão no diretório de saída."
+  fi
+else
+  echo "FastQC foi pulado conforme solicitado."
+fi
+
+echo "Script finalizado."
 exec bash
