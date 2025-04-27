@@ -2,15 +2,16 @@
 
 # ===================== Apresentacao =====================
 echo "==================================================="
-echo " Script de Alinhamento de FASTQ pareados usando BWA-MEM "
+echo " Script de Alinhamento de FASTQ pareados usando BWA-MEM + Conversao SAM/BAM "
 echo "==================================================="
 echo ""
-echo "Este script alinha arquivos FASTQ.gz pareados usando o algoritmo BWA-MEM."
+echo "Este script alinha arquivos FASTQ.gz pareados usando o algoritmo BWA-MEM e converte os arquivos SAM para BAM ordenados."
 echo "Inputs necessários:"
 echo " - Arquivos FASTQ pareados (R1 e R2), concatenados e trimados."
 echo " - Arquivos de índice do genoma de referência (.fa, .amb, .ann, .bwt, .pac, .sa, .fai)."
 echo "Outputs gerados:"
 echo " - Arquivos BAM alinhados e ordenados."
+echo " - Arquivos de índice BAM (.bai)."
 echo " - Um arquivo de LOG do processo."
 echo ""
 echo "IMPORTANTE:"
@@ -90,7 +91,7 @@ echo "Seu servidor possui:"
 echo "- Threads disponíveis: $TOTAL_THREADS"
 echo "- Memória RAM disponível: ${TOTAL_RAM}GB"
 
-echo "Quantas threads deseja usar? (recomendo deixar um pouco livre, usar tipo $((TOTAL_THREADS-4)))"
+echo "Quantas threads deseja usar para o BWA? (recomendo deixar um pouco livre, usar tipo $((TOTAL_THREADS-4)))"
 read NUM_THREADS
 
 echo "Quanto de RAM deseja alocar? (min: 4GB, máx: ${TOTAL_RAM}GB, recomendo deixar um pouco livre)"
@@ -98,7 +99,7 @@ read MEMORY_RAM
 
 # Criar pasta de output
 TIMESTAMP=$(date +"%d-%m-%Y_%Hh%Mm")
-OUTPUT_DIR="$INPUT_DIR/arquivos_alinhados_(BAM)_$TIMESTAMP"
+OUTPUT_DIR="$INPUT_DIR/arquivos_alinhados_BAM_$TIMESTAMP"
 mkdir -p "$OUTPUT_DIR"
 
 # ===================== Recapitulação =====================
@@ -130,28 +131,54 @@ if [[ "$FINAL_CONFIRM" != "yes" ]]; then
 fi
 
 # ===================== Execução =====================
-echo "Iniciando o alinhamento..."
+echo "Iniciando o alinhamento e conversão..."
+
+SCRIPT_START_TIME=$(date +%s)
 
 for ((i=0; i<${#FASTQ_FILES[@]}; i+=2)); do
   SAMPLE_R1=${FASTQ_FILES[$i]}
   SAMPLE_R2=${FASTQ_FILES[$((i+1))]}
   SAMPLE_NAME=$(basename "$SAMPLE_R1" | cut -d '_' -f1)
+  OUTPUT_SAM="$OUTPUT_DIR/${SAMPLE_NAME}.sam"
   OUTPUT_BAM="$OUTPUT_DIR/${SAMPLE_NAME}_aligned.bam"
   LOG_FILE="$OUTPUT_DIR/${SAMPLE_NAME}_alignment.log"
 
+  SAMPLE_START_TIME=$(date +%s)
+
+  # Rodar BWA para gerar SAM
   docker run --rm \
     $USE_USER \
     -v "$INPUT_DIR":/data \
     -v "$GENOME_DIR":/ref \
     -v "$OUTPUT_DIR":/output \
     biocontainers/bwa:v0.7.17_cv1 \
-    bash -c "set -e; bwa mem -t $NUM_THREADS /ref/$GENOME_FA /data/$SAMPLE_R1 /data/$SAMPLE_R2 | samtools view -Sb - | samtools sort -o /output/${SAMPLE_NAME}_aligned.bam -" 2>&1 | tee "$LOG_FILE"
+    bash -c "set -e; bwa mem -t $NUM_THREADS /ref/$GENOME_FA /data/$SAMPLE_R1 /data/$SAMPLE_R2 > /output/${SAMPLE_NAME}.sam" 2>&1 | tee "$LOG_FILE"
 
+  # Rodar Samtools para converter SAM para BAM ordenado
+  docker run --rm \
+    $USE_USER \
+    -v "$OUTPUT_DIR":/workdir \
+    staphb/samtools:latest \
+    bash -c "set -e; samtools view -@ $NUM_THREADS -bS /workdir/${SAMPLE_NAME}.sam | samtools sort -@ $NUM_THREADS -o /workdir/${SAMPLE_NAME}_aligned.bam -; samtools index /workdir/${SAMPLE_NAME}_aligned.bam"
+
+  # Remover arquivo SAM intermediário
+  rm "$OUTPUT_DIR/${SAMPLE_NAME}.sam"
+
+  SAMPLE_END_TIME=$(date +%s)
+  SAMPLE_DURATION=$((SAMPLE_END_TIME - SAMPLE_START_TIME))
+  echo "Tempo para processar ${SAMPLE_NAME}: ${SAMPLE_DURATION} segundos." | tee -a "$LOG_FILE"
 done
+
+SCRIPT_END_TIME=$(date +%s)
+TOTAL_DURATION=$((SCRIPT_END_TIME - SCRIPT_START_TIME))
+TOTAL_HOURS=$((TOTAL_DURATION / 3600))
+TOTAL_MINUTES=$(((TOTAL_DURATION % 3600) / 60))
+TOTAL_SECONDS=$((TOTAL_DURATION % 60))
 
 echo ""
 echo "======================================================"
 echo " Alinhamento concluído! Arquivos BAM e logs salvos em:"
 echo " $OUTPUT_DIR"
+echo " Tempo total de execução: ${TOTAL_HOURS}h ${TOTAL_MINUTES}m ${TOTAL_SECONDS}s."
 echo "======================================================"
 exit 0
