@@ -76,6 +76,22 @@ else
   USE_USER=""
 fi
 
+# ===================== Recursos Computacionais =====================
+echo "=============================================================="
+echo "Atenção: Esta ferramenta consome pouca CPU e RAM, mas é ideal alocar com segurança."
+echo "Recomenda-se não usar 100% dos recursos para manter estabilidade do sistema."
+echo "=============================================================="
+echo "Esta ferramenta usa CPU, mas consome poucos recursos."
+echo "Ainda assim, você pode limitar os recursos alocados."
+TOTAL_THREADS=$(nproc)
+TOTAL_RAM=$(free -g | awk '/Mem:/ {print $2}')
+echo "Seu servidor possui $TOTAL_THREADS threads e ${TOTAL_RAM}GB de RAM."
+echo "Quantas threads você deseja usar? (padrão = 1)"
+read NUM_THREADS
+echo "Quantos GB de RAM deseja alocar? (padrão = 2GB)"
+echo "Nota: seu servidor possui ${TOTAL_RAM}GB. Uma boa escolha seria algo como $((TOTAL_RAM - 2))GB."
+read MEMORY_RAM
+
 # ===================== Diretório de saída =====================
 TIMESTAMP=$(date +"%d-%m-%Y_%Hh%Mm")
 OUTPUT_DIR="$INPUT_DIR/4-output_add_readgroups_$TIMESTAMP"
@@ -93,6 +109,8 @@ echo "RGPL: $RGPL"
 echo "RGPU: $RGPU"
 echo "RGSM: $RGSM"
 echo "Usuário Docker: ${CUSTOM_UID:-root}"
+echo "Threads: $NUM_THREADS"
+echo "RAM: ${MEMORY_RAM}GB"
 echo "Saída: $OUTPUT_BAM"
 echo "Log: $LOG_FILE"
 echo "================================================="
@@ -110,6 +128,8 @@ START_TIME=$(date +%s)
 docker run --rm $USE_USER \
   -v "$INPUT_DIR":/data \
   -v "$OUTPUT_DIR":/output \
+  -e _JAVA_OPTIONS="-Xmx${MEMORY_RAM}g" \
+  --cpus=$NUM_THREADS \
   broadinstitute/gatk:latest gatk AddOrReplaceReadGroups \
   -I /data/$BAM_FILE \
   -O /output/$(basename $OUTPUT_BAM) \
