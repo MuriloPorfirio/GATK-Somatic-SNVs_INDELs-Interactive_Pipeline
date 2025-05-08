@@ -1,0 +1,184 @@
+#!/bin/bash
+
+echo "=============================================================="
+echo " SCRIPT INTERATIVO PARA CHAMADA DE VARIANTES SOMÁTICAS (Mutect2)"
+echo "=============================================================="
+echo ""
+echo "Este script executa o GATK Mutect2, que identifica variantes somáticas"
+echo "em amostras de câncer. Pode ser executado em modo TUMOR-ONLY ou TUMOR/NORMAL."
+echo ""
+echo "FERRAMENTAS UTILIZADAS:"
+echo "- GATK (via Docker: broadinstitute/gatk)"
+echo ""
+echo "O QUE ESTE SCRIPT IRÁ GERAR:"
+echo "- Arquivo .vcf.gz com variantes somáticas"
+echo "- Arquivo .vcf.gz.tbi (índice)"
+echo "- Arquivo de log da execução"
+echo ""
+echo "ARQUIVOS NECESSÁRIOS:"
+echo "- BAM da amostra tumoral (com RG e duplicatas marcadas)"
+echo "- Genoma de referência .fa (.fai e .dict na mesma pasta)"
+echo ""
+echo "ARQUIVOS OPCIONAIS (altamente recomendados):"
+echo "- Painel de Normais (PoN): variantes recorrentes em tecidos normais"
+echo "- BAM do tecido germinativo (normal) do mesmo paciente"
+echo "- Germline Resource: arquivo gnomAD com frequências alélicas (ex: af-only-gnomad.hg38.vcf.gz + .tbi)"
+echo ""
+echo "OBS: Se você não tiver PoN nem amostra normal, o uso do gnomAD é altamente recomendado."
+echo "Você pode baixar o gnomAD em: https://console.cloud.google.com/storage/browser/gatk-best-practices/somatic-hg38"
+echo ""
+
+echo "Podemos continuar? (yes/no)"
+read START_CONFIRM
+[[ "$START_CONFIRM" != "yes" ]] && echo "Script cancelado." && exit 0
+
+# === Genoma ===
+echo ""
+echo "Digite o caminho COMPLETO da pasta com o genoma .fa:"
+read GENOME_DIR
+[[ ! -d "$GENOME_DIR" ]] && echo "Erro: pasta não encontrada." && exit 1
+echo "Arquivos encontrados:"
+ls "$GENOME_DIR"
+echo "Digite o NOME exato do arquivo .fa:"
+read GENOME_FA
+GENOME="$GENOME_DIR/$GENOME_FA"
+
+if [[ ! -f "$GENOME" || ! -f "$GENOME_DIR/${GENOME_FA}.fai" || ! -f "$GENOME_DIR/${GENOME_FA%.fa}.dict" ]]; then
+  echo "Erro: .fa, .fai e .dict devem estar todos presentes e consistentes."
+  exit 1
+fi
+
+# === BAM Tumoral ===
+echo ""
+echo "Digite o caminho COMPLETO da pasta com os arquivos BAM:"
+read BAM_DIR
+[[ ! -d "$BAM_DIR" ]] && echo "Erro: pasta não encontrada." && exit 1
+echo "Arquivos encontrados:"
+ls "$BAM_DIR"
+echo "Digite o nome exato do BAM TUMORAL:"
+read BAM_TUMOR
+[[ ! -f "$BAM_DIR/$BAM_TUMOR" ]] && echo "Erro: arquivo não encontrado." && exit 1
+
+# === Painel de Normais (PoN) ===
+echo ""
+echo "Você possui Painel de Normais (PoN)? (yes/no)"
+read HAS_PON
+if [[ "$HAS_PON" == "yes" ]]; then
+  echo "Digite o caminho COMPLETO da pasta com o arquivo .vcf.gz do PoN:"
+  read PON_DIR
+  [[ ! -d "$PON_DIR" ]] && echo "Erro: pasta não encontrada." && exit 1
+  echo "Arquivos encontrados:"
+  ls "$PON_DIR"
+  echo "Digite o NOME exato do arquivo .vcf.gz do PoN:"
+  read PON_FILE
+  PON_PATH="$PON_DIR/$PON_FILE"
+  [[ ! -f "$PON_PATH" ]] && echo "Erro: PoN não encontrado." && exit 1
+  if [[ ! -f "$PON_PATH.tbi" ]]; then
+    echo "Erro: arquivo .tbi correspondente ao PoN não encontrado na mesma pasta."
+    exit 1
+  fi
+fi
+
+# === Amostra Normal (Germinativo) ===
+echo ""
+echo "Você possui BAM do tecido germinativo (normal) do mesmo paciente? (yes/no)"
+read HAS_NORMAL
+if [[ "$HAS_NORMAL" == "yes" ]]; then
+  echo "Digite o caminho COMPLETO da pasta com o BAM NORMAL:"
+  read NORMAL_DIR
+  [[ ! -d "$NORMAL_DIR" ]] && echo "Erro: pasta não encontrada." && exit 1
+  echo "Arquivos encontrados:"
+  ls "$NORMAL_DIR"
+  echo "Digite o NOME exato do BAM NORMAL:"
+  read BAM_NORMAL
+  BAM_NORMAL_PATH="$NORMAL_DIR/$BAM_NORMAL"
+  [[ ! -f "$BAM_NORMAL_PATH" ]] && echo "Erro: BAM normal não encontrado." && exit 1
+  if [[ ! -f "$BAM_NORMAL_PATH.bai" ]]; then
+    echo "Erro: arquivo .bai correspondente ao BAM normal não encontrado na mesma pasta."
+    exit 1
+  fi
+fi
+
+# === Germline Resource (gnomAD) ===
+echo ""
+echo "Você possui o arquivo af-only-gnomad.hg38.vcf.gz (gnomAD)? (yes/no)"
+read HAS_GNOMAD
+if [[ "$HAS_GNOMAD" == "yes" ]]; then
+  echo "Digite o caminho COMPLETO da pasta com o arquivo af-only-gnomad.hg38.vcf.gz:"
+  read GNOMAD_DIR
+  [[ ! -d "$GNOMAD_DIR" ]] && echo "Erro: pasta não encontrada." && exit 1
+  echo "Arquivos encontrados:"
+  ls "$GNOMAD_DIR"
+  echo "Digite o NOME exato do arquivo af-only-gnomad.hg38.vcf.gz:"
+  read GNOMAD_VCF
+  GNOMAD_VCF_PATH="$GNOMAD_DIR/$GNOMAD_VCF"
+  [[ ! -f "$GNOMAD_VCF_PATH" ]] && echo "Erro: VCF do gnomAD não encontrado." && exit 1
+  if [[ ! -f "$GNOMAD_VCF_PATH.tbi" ]]; then
+    echo "Erro: arquivo .tbi correspondente ao VCF do gnomAD não encontrado na mesma pasta."
+    exit 1
+  fi
+else
+  echo "AVISO: Como você não possui gnomAD, Mutect2 pode ter menor capacidade de filtrar variantes germinativas."
+fi
+
+# === Docker UID ===
+echo ""
+echo "Digite o UID para rodar no Docker (ex: 1006) ou 'no' para root:"
+read UID_INPUT
+USE_USER=""
+[[ "$UID_INPUT" =~ ^[0-9]+$ ]] && USE_USER="--user $UID_INPUT"
+
+# === Threads e RAM ===
+TOTAL_THREADS=$(nproc)
+echo "Seu sistema possui $TOTAL_THREADS threads disponíveis. Quantas deseja usar?"
+read THREADS
+TOTAL_RAM=$(free -g | awk '/Mem:/ {print $2}')
+echo "Memória total: ${TOTAL_RAM} GB. Quanto deseja usar?"
+read RAM
+
+# === Pasta de saída ===
+TS=$(date +"%d-%m-%Y_%Hh%Mm")
+OUTPUT_DIR="$BAM_DIR/8-mutect2_output_$TS"
+mkdir -p "$OUTPUT_DIR"
+
+# === Recapitulação ===
+echo ""
+echo "================ RECAPITULAÇÃO ================"
+echo "Genoma: $GENOME"
+echo "BAM Tumoral: $BAM_TUMOR"
+[[ "$HAS_NORMAL" == "yes" ]] && echo "BAM Normal: $BAM_NORMAL"
+[[ "$HAS_PON" == "yes" ]] && echo "PoN: $PON_FILE"
+[[ "$HAS_GNOMAD" == "yes" ]] && echo "gnomAD: $GNOMAD_VCF"
+echo "Saída: $OUTPUT_DIR"
+echo "Usuário Docker: ${UID_INPUT:-root}"
+echo "Threads: $THREADS | RAM: ${RAM}GB"
+echo "================================================"
+echo "Confirmar execução? (yes/no)"
+read CONFIRM
+[[ "$CONFIRM" != "yes" ]] && echo "Cancelado." && exit 0
+
+# === Execução ===
+BAM_TUMOR_BASENAME=$(basename "$BAM_TUMOR" .bam)
+VCF_OUT="$OUTPUT_DIR/${BAM_TUMOR_BASENAME}_somatic.vcf.gz"
+LOG="$OUTPUT_DIR/${BAM_TUMOR_BASENAME}_mutect2.log"
+
+CMD="gatk Mutect2 -R /genome/$(basename "$GENOME") -I /bam/$(basename "$BAM_TUMOR") -O /output/$(basename "$VCF_OUT")"
+
+[[ "$HAS_NORMAL" == "yes" ]] && CMD+=" -I /normal/$(basename "$BAM_NORMAL") --normal-sample NORMAL"
+[[ "$HAS_PON" == "yes" ]] && CMD+=" --panel-of-normals /pon/$(basename "$PON_FILE")"
+[[ "$HAS_GNOMAD" == "yes" ]] && CMD+=" --germline-resource /gnomad/$(basename "$GNOMAD_VCF")"
+
+docker run --rm $USE_USER \
+  -v "$GENOME_DIR":/genome \
+  -v "$BAM_DIR":/bam \
+  $( [[ "$HAS_NORMAL" == "yes" ]] && echo -v "$NORMAL_DIR":/normal ) \
+  $( [[ "$HAS_PON" == "yes" ]] && echo -v "$PON_DIR":/pon ) \
+  $( [[ "$HAS_GNOMAD" == "yes" ]] && echo -v "$GNOMAD_DIR":/gnomad ) \
+  -v "$OUTPUT_DIR":/output \
+  broadinstitute/gatk \
+  bash -c "$CMD" &> "$LOG"
+
+echo "=============================================================="
+echo "Mutect2 finalizado. Output em: $OUTPUT_DIR"
+echo "Log: $LOG"
+echo "=============================================================="
