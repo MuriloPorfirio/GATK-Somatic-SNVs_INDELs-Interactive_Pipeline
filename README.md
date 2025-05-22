@@ -6,6 +6,18 @@ This repository contains Bash scripts for preprocessing genomic sequencing data 
 
 ## ⚠️ Important Guidelines Before Use
 
+## Docker-Based Workflow
+
+Most steps in this pipeline are **containerized using Docker**. This ensures reproducibility and avoids software conflicts.  
+Before running the scripts, make sure the following Docker images are installed locally (or available for pull):
+
+biowardrobe2/trimgalore:v0.4.4
+biocontainers/fastqc:v0.11.9_cv8
+ewels/multiqc
+biocontainers/bwa:v0.7.17_cv1
+staphb/samtools:latest
+broadinstitute/gatk:latest
+
 ### Interactive and long scripts
 
 All scripts in this repository are **interactive**, prompting the user with several questions. Because of that, they are visually long and **should not be pasted directly into a terminal within a screen session**, because:
