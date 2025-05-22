@@ -81,7 +81,7 @@ done
 
 # Criar pasta de saída
 TIMESTAMP=$(date +"%d-%m-%Y_%Hh%Mm")
-OUTPUT_DIR="$INPUT_DIR/multiqc_output_$TIMESTAMP"
+OUTPUT_DIR="$INPUT_DIR/3-multiqc_output_$TIMESTAMP"
 mkdir -p "$OUTPUT_DIR"
 
 # Resumo para o usuário
