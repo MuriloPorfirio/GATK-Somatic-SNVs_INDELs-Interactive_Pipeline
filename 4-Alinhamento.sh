@@ -99,7 +99,7 @@ read MEMORY_RAM
 
 # Criar pasta de output
 TIMESTAMP=$(date +"%d-%m-%Y_%Hh%Mm")
-OUTPUT_DIR="$INPUT_DIR/arquivos_alinhados_BAM_$TIMESTAMP"
+OUTPUT_DIR="$INPUT_DIR/4-arquivos_alinhados_BAM_$TIMESTAMP"
 mkdir -p "$OUTPUT_DIR"
 
 # ===================== Recapitulação =====================
