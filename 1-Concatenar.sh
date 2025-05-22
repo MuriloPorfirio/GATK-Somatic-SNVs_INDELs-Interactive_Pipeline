@@ -71,7 +71,7 @@ fi
 
 # Pasta de saída
 TIMESTAMP=$(date +"%d-%m-%Y_%Hh%Mm")
-OUTPUT_DIR="$CAMINHO/arquivos_concatenados_$TIMESTAMP"
+OUTPUT_DIR="$CAMINHO/1-arquivos_concatenados_$TIMESTAMP"
 mkdir -p "$OUTPUT_DIR"
 
 echo ""
