@@ -94,7 +94,7 @@ read MEMORY_RAM
 
 # ===================== Diretório de saída =====================
 TIMESTAMP=$(date +"%d-%m-%Y_%Hh%Mm")
-OUTPUT_DIR="$INPUT_DIR/4-output_add_readgroups_$TIMESTAMP"
+OUTPUT_DIR="$INPUT_DIR/5-output_add_readgroups_$TIMESTAMP"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_BAM="$OUTPUT_DIR/${BAM_FILE%.bam}_with_RG.bam"
 LOG_FILE="$OUTPUT_DIR/${BAM_FILE%.bam}_addRG.log"
