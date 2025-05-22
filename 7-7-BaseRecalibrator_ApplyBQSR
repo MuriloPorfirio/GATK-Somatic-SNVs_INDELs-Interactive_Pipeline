@@ -1,0 +1,172 @@
+#!/bin/bash
+
+echo "=============================================================="
+echo " INTERACTIVE SCRIPT FOR BASE RECALIBRATION (GATK)"
+echo "=============================================================="
+echo ""
+echo "This script performs base quality score recalibration (BQSR)"
+echo "using GATK tools: BaseRecalibrator and ApplyBQSR."
+echo ""
+echo "GOAL: Improve variant calling accuracy by correcting"
+echo "systematic errors in base quality scores in BAM files."
+echo ""
+echo "TOOLS USED:"
+echo "- GATK (via Docker: broadinstitute/gatk)"
+echo "- BaseRecalibrator and ApplyBQSR"
+echo ""
+echo "REQUIRED INPUTS:"
+echo "- Reference genome .fa (with .fai and .dict in the same folder)"
+echo "- Known variant VCFs (.vcf.gz) WITH their .tbi index files"
+echo "  You need EXACTLY the following pairs (in this ORDER):"
+echo "   1) dbSNP138 (.vcf.gz and .tbi)"
+echo "   2) Mills_and_1000G (.vcf.gz and .tbi)"
+echo "   3) 1000G_phase1 (.vcf.gz and .tbi)"
+echo "   4) known_indels (.vcf.gz and .tbi)"
+echo ""
+echo "You can download recommended files for hg38 at:"
+echo "https://console.cloud.google.com/storage/browser/genomics-public-data/resources/broad/hg38/v0"
+echo ""
+echo "Shall we continue? (yes/no)"
+read START_CONFIRM
+[[ "$START_CONFIRM" != "yes" ]] && echo "Script cancelled." && exit 0
+
+# === Reference Genome ===
+echo ""
+echo "Enter the FULL path to the folder containing the .fa genome file:"
+read GENOME_DIR
+[[ ! -d "$GENOME_DIR" ]] && echo "Directory not found." && exit 1
+echo "Files found in $GENOME_DIR:"
+ls "$GENOME_DIR"
+echo ""
+echo "Enter the EXACT NAME of the .fa reference file (e.g., hg38.fa):"
+read GENOME_FA
+GENOME="$GENOME_DIR/$GENOME_FA"
+
+if [[ ! -f "$GENOME" || ! -f "$GENOME_DIR/${GENOME_FA}.fai" || ! -f "$GENOME_DIR/${GENOME_FA%.fa}.dict" ]]; then
+  echo "Error: .fa, .fai, and .dict must all be in the same folder with consistent names."
+  exit 1
+fi
+
+# === Known Variants ===
+echo ""
+echo "Enter the FULL path to the folder containing the VCF files (.vcf.gz + .tbi):"
+read VCF_DIR
+[[ ! -d "$VCF_DIR" ]] && echo "Directory not found." && exit 1
+echo "Files found in $VCF_DIR:"
+ls "$VCF_DIR"
+
+echo ""
+echo "Now enter the NAMES of the .vcf.gz files AND their .tbi files, in this ORDER:"
+echo "  1) dbSNP138.vcf.gz dbSNP138.vcf.gz.tbi"
+echo "  2) Mills.vcf.gz Mills.vcf.gz.tbi"
+echo "  3) 1000G.vcf.gz 1000G.vcf.gz.tbi"
+echo "  4) known_indels.vcf.gz known_indels.vcf.gz.tbi"
+echo ""
+echo "Separate them by space (total of 8 files):"
+read -a VCF_FILES
+
+if [[ "${#VCF_FILES[@]}" -ne 8 ]]; then
+  echo "Error: you must provide exactly 8 files (.vcf.gz and corresponding .tbi)."
+  exit 1
+fi
+
+# === BAM Files ===
+echo ""
+echo "Enter the FULL path to the folder containing the .bam files:"
+read BAM_DIR
+[[ ! -d "$BAM_DIR" ]] && echo "Directory not found." && exit 1
+echo "Files found in $BAM_DIR:"
+ls "$BAM_DIR"
+
+echo ""
+echo "Enter the NAMES of the .bam files (already with RG and marked duplicates), separated by space:"
+read -a BAM_FILES
+[[ "${#BAM_FILES[@]}" -eq 0 ]] && echo "Error: no BAM files provided." && exit 1
+
+# === Docker UID ===
+echo ""
+echo "Enter the UID to run Docker (e.g., 1006), or 'no' to run as root:"
+read UID_INPUT
+USE_USER=""
+[[ "$UID_INPUT" =~ ^[0-9]+$ ]] && USE_USER="--user $UID_INPUT"
+
+# === Threads and RAM ===
+TOTAL_THREADS=$(nproc)
+echo "Your system has $TOTAL_THREADS available threads."
+echo "How many threads do you want to use? (recommended: $((TOTAL_THREADS - 2))):"
+read THREADS
+
+TOTAL_RAM=$(free -g | awk '/Mem:/ {print $2}')
+echo "Available memory: ${TOTAL_RAM} GB. How much do you want to use? (e.g., $((TOTAL_RAM - 2))):"
+read RAM
+
+# === Create Output Folder ===
+TIMESTAMP=$(date +"%d-%m-%Y_%Hh%Mm")
+OUTPUT_DIR="$BAM_DIR/7-BaseRecalibrator_ApplyBQSR_$TIMESTAMP"
+mkdir -p "$OUTPUT_DIR/tmp_bqsr"
+
+# === Summary ===
+echo ""
+echo "================ SUMMARY ================"
+echo "Reference genome: $GENOME"
+echo "Known variant VCFs:"
+for f in "${VCF_FILES[@]}"; do echo "- $f"; done
+echo "BAM directory: $BAM_DIR"
+echo "BAM files:"
+for f in "${BAM_FILES[@]}"; do echo "- $f"; done
+echo "Docker user: ${UID_INPUT:-root}"
+echo "Threads: $THREADS"
+echo "Memory: ${RAM}GB"
+echo "Output: $OUTPUT_DIR"
+echo "========================================="
+echo "Confirm execution? (yes/no)"
+read FINAL_CONFIRM
+[[ "$FINAL_CONFIRM" != "yes" ]] && echo "Execution cancelled." && exit 0
+
+# === Execution ===
+SCRIPT_START=$(date +%s)
+for BAM in "${BAM_FILES[@]}"; do
+  SAMPLE=$(basename "$BAM" .bam)
+  echo ""
+  echo "Starting BQSR for: $SAMPLE"
+
+  docker run --rm $USE_USER \
+    -v "$GENOME_DIR":/genome \
+    -v "$VCF_DIR":/vcfs \
+    -v "$BAM_DIR":/bam \
+    -v "$OUTPUT_DIR":/output \
+    broadinstitute/gatk \
+    bash -c "
+      mkdir -p /output/tmp_bqsr
+
+      gatk BaseRecalibrator \
+        -R /genome/$GENOME_FA \
+        -I /bam/$BAM \
+        --known-sites /vcfs/${VCF_FILES[0]} \
+        --known-sites /vcfs/${VCF_FILES[2]} \
+        --known-sites /vcfs/${VCF_FILES[4]} \
+        --known-sites /vcfs/${VCF_FILES[6]} \
+        -O /output/${SAMPLE}_recal_data.table \
+        --verbosity INFO \
+        --tmp-dir /output/tmp_bqsr
+
+      gatk ApplyBQSR \
+        -R /genome/$GENOME_FA \
+        -I /bam/$BAM \
+        --bqsr-recal-file /output/${SAMPLE}_recal_data.table \
+        -O /output/${SAMPLE}_recalibrated.bam \
+        --verbosity INFO \
+        --tmp-dir /output/tmp_bqsr
+    " &> "$OUTPUT_DIR/${SAMPLE}_bqsr.log"
+
+  echo "Finished for $SAMPLE. Log: $OUTPUT_DIR/${SAMPLE}_bqsr.log"
+done
+
+SCRIPT_END=$(date +%s)
+DURATION=$((SCRIPT_END - SCRIPT_START))
+echo ""
+echo "=============================================================="
+echo "BQSR completed successfully!"
+echo "Output available at: $OUTPUT_DIR"
+echo "Total time: $((DURATION / 3600))h $((DURATION % 3600 / 60))m $((DURATION % 60))s"
+echo "=============================================================="
