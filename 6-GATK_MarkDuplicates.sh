@@ -68,7 +68,7 @@ read MEMORY_RAM
 
 # ===================== Criando diretório de output =====================
 TIMESTAMP=$(date +"%d-%m-%Y_%Hh%Mm")
-OUTPUT_DIR="$INPUT_DIR/5-output_marked_duplicates_$TIMESTAMP"
+OUTPUT_DIR="$INPUT_DIR/6-output_marked_duplicates_$TIMESTAMP"
 mkdir -p "$OUTPUT_DIR"
 
 # ===================== Recapitulação =====================
