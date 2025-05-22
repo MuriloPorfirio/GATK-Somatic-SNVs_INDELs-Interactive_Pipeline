@@ -54,7 +54,7 @@ fi
 
 # Criação da pasta de saída
 TIMESTAMP=$(date +"%d-%m-%Y_%Hh%Mm")
-OUTPUT_DIR="$INPUT_DIR/arquivos_trimados_$TIMESTAMP"
+OUTPUT_DIR="$INPUT_DIR/2-arquivos_trimados_$TIMESTAMP"
 mkdir -p "$OUTPUT_DIR"
 
 echo "Os arquivos serão salvos em: $OUTPUT_DIR"
@@ -149,7 +149,7 @@ while [[ $i -lt ${#FILES[@]} ]]; do
     -v "$INPUT_DIR":/data \
     $USE_USER \
     biowardrobe2/trimgalore:v0.4.4 \
-    trim_galore --paired "/data/$R1" "/data/$R2" -o "/data/arquivos_trimados_$TIMESTAMP"
+    trim_galore --paired "/data/$R1" "/data/$R2" -o "/data/2-arquivos_trimados_$TIMESTAMP"
 
   if [[ $? -ne 0 ]]; then
     echo "Erro ao processar: $R1 e $R2"
