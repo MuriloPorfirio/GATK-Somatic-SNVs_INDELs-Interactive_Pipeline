@@ -12,11 +12,17 @@ Most steps in this pipeline are **containerized using Docker**. This ensures rep
 Before running the scripts, make sure the following Docker images are installed locally (or available for pull):
 
 biowardrobe2/trimgalore:v0.4.4
+
 biocontainers/fastqc:v0.11.9_cv8
+
 ewels/multiqc
+
 biocontainers/bwa:v0.7.17_cv1
+
 staphb/samtools:latest
+
 broadinstitute/gatk:latest
+
 
 ### Interactive and long scripts
 
