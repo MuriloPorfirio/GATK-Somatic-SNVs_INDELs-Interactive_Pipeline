@@ -70,5 +70,5 @@ All scripts in this repository are **interactive**, prompting the user with seve
 ---
 
 ## Author
-Murilo Porfírio de Aguiar and GPT  
+Murilo and GPT  
 murilo.porfirio@yahoo.com
