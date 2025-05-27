@@ -65,22 +65,9 @@ if [[ "$CONTINUE" != "yes" ]]; then
   exec bash
 fi
 
-TOTAL_CPUS=$(nproc)
-SAFE_CPUS=$((TOTAL_CPUS / 2))
 TOTAL_RAM_GB=$(free -g | awk '/^Mem:/ {print $2}')
 DEFAULT_RAM_GB=4
 SUGGESTED_RAM_GB=$((TOTAL_RAM_GB / 2))
-
-echo ""
-echo "This server has $TOTAL_CPUS threads available."
-echo "It is recommended to use up to $SAFE_CPUS threads to avoid impacting other users."
-echo "How many threads do you want to use? (or 'exit')"
-read THREADS
-if [[ "$THREADS" == "exit" ]]; then exec bash; fi
-if ! [[ "$THREADS" =~ ^[0-9]+$ ]]; then
-  echo "Invalid number of threads."
-  exec bash
-fi
 
 echo ""
 echo "This script typically uses around ${DEFAULT_RAM_GB}GB of RAM."
@@ -92,6 +79,12 @@ if ! [[ "$RAM" =~ ^[0-9]+$ ]]; then
   echo "Invalid value for RAM."
   exec bash
 fi
+
+echo ""
+echo "This script uses the Trim Galore! tool, which internally calls Cutadapt for trimming."
+echo "Although Cutadapt supports multithreading, the Docker image currently used does not expose that option."
+echo "Therefore, the trimming will run in single-threaded mode by default."
+echo "If you need multithreading, consider using a newer Docker image that supports the --cores parameter for Cutadapt."
 
 echo ""
 echo "Do you want to run Docker with a specific user (--user UID)?"
@@ -148,7 +141,6 @@ echo "Files to be processed:"
 for file in "${FILES[@]}"; do
   echo "- $file"
 done
-echo "Threads: $THREADS"
 echo "RAM: $RAM GB"
 echo "Docker UID: ${CUSTOM_UID:-default}"
 echo "Quality: $QUALITY"
