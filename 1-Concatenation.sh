@@ -4,102 +4,108 @@ echo "Starting FASTQ file concatenation script."
 echo "Press Enter to confirm you intentionally pasted this script into the terminal."
 read
 
-# Initial question
+START_TIME=$(date +%s)
+
+# Ask for number of patients
 echo "How many patients will you be working with? (or type 'exit' to quit)"
 read PATIENTS
 if [[ "$PATIENTS" == "exit" ]]; then exec bash; fi
 if ! [[ "$PATIENTS" =~ ^[0-9]+$ ]]; then
-  echo "Invalid input. Please enter an integer number."
+  echo "Invalid input. Please enter an integer."
   exec bash
 fi
 
-# Paired files?
-echo "Are the files for these patients paired-end? (yes/no or 'exit')"
+# Check if files are paired-end
+echo "Are the files paired-end? (yes/no or 'exit')"
 read PAIRED
 if [[ "$PAIRED" == "exit" ]]; then exec bash; fi
-
 if [[ "$PAIRED" != "yes" ]]; then
-  echo "This script only works with paired-end files. Exiting."
+  echo "This script currently only supports paired-end data."
   exec bash
 fi
 
-# Automatic calculation
-TOTAL_FILES=$((PATIENTS * 4))
-R1_FILES_COUNT=$((PATIENTS * 2))
-R2_FILES_COUNT=$((PATIENTS * 2))
-
-echo ""
-echo "There will be $TOTAL_FILES total files:"
-echo "- $R1_FILES_COUNT files for R1"
-echo "- $R2_FILES_COUNT files for R2"
-echo ""
-
-# File path
-echo "Enter the FULL path to the directory containing the files (no trailing slash, or 'exit' to quit):"
+# Ask for path to files
+echo "Enter the full path to the directory containing the FASTQ files:"
 read FILE_PATH
-if [[ "$FILE_PATH" == "exit" ]]; then exec bash; fi
 if [[ ! -d "$FILE_PATH" ]]; then
-  echo "Directory '$FILE_PATH' not found."
+  echo "Directory not found: $FILE_PATH"
   exec bash
 fi
 
-echo "Files found in $FILE_PATH:"
-ls "$FILE_PATH"
+# Confirm
+echo "Listing FASTQ files in $FILE_PATH:"
+ls "$FILE_PATH" | grep -E "\.fastq(\.gz)?$"
 echo ""
-echo "All files must be in this directory."
-echo "If not, type 'exit' and move the files to a single location."
-echo "Do you want to continue? (yes/no or 'exit')"
+echo "If not all required files are in the directory, move them there first."
+echo "Continue? (yes/no or 'exit')"
 read CONTINUE
 if [[ "$CONTINUE" == "exit" ]]; then exec bash; fi
 if [[ "$CONTINUE" != "yes" ]]; then echo "Cancelled."; exec bash; fi
-
-# R1 files
-echo "Enter the EXACT names of the $R1_FILES_COUNT R1 files, separated by space:"
-read -a R1_FILES
-if [[ "${#R1_FILES[@]}" -ne "$R1_FILES_COUNT" ]]; then
-  echo "Incorrect number of R1 files provided."
-  exec bash
-fi
-
-# R2 files
-echo "Enter the EXACT names of the $R2_FILES_COUNT R2 files, separated by space:"
-read -a R2_FILES
-if [[ "${#R2_FILES[@]}" -ne "$R2_FILES_COUNT" ]]; then
-  echo "Incorrect number of R2 files provided."
-  exec bash
-fi
 
 # Output folder
 TIMESTAMP=$(date +"%d-%m-%Y_%Hh%Mm")
 OUTPUT_DIR="$FILE_PATH/1-concatenated_fastq_$TIMESTAMP"
 mkdir -p "$OUTPUT_DIR"
+LOG_FILE="$OUTPUT_DIR/concat_log.txt"
 
-echo ""
-echo "The concatenated files will be saved in: $OUTPUT_DIR"
-echo "Do you want to proceed with concatenation? (yes/no or 'exit')"
-read CONFIRM_FINAL
-if [[ "$CONFIRM_FINAL" == "exit" ]]; then exec bash; fi
-if [[ "$CONFIRM_FINAL" != "yes" ]]; then echo "Cancelled."; exec bash; fi
+echo "Output directory: $OUTPUT_DIR" | tee "$LOG_FILE"
 
-# Concatenation
-echo ""
-echo "Starting concatenation..."
-for ((i=0; i<PATIENTS; i++)); do
-  R1_1=${R1_FILES[$((i*2))]}
-  R1_2=${R1_FILES[$((i*2+1))]}
-  R2_1=${R2_FILES[$((i*2))]}
-  R2_2=${R2_FILES[$((i*2+1))]}
+# Process each patient
+for ((i=1; i<=PATIENTS; i++)); do
+  echo ""
+  echo "=== Patient $i ==="
+  echo "Enter a unique sample name (e.g., HG008):"
+  read SAMPLE_NAME
 
-  PREFIX=$(echo "${R1_1}" | cut -d'_' -f1-2)
+  echo "How many labels (lanes) does this sample have?"
+  read LABELS
+  if ! [[ "$LABELS" =~ ^[0-9]+$ ]]; then
+    echo "Invalid number." | tee -a "$LOG_FILE"
+    continue
+  fi
 
-  echo "Concatenating files for sample: $PREFIX"
-  cat "$FILE_PATH/$R1_1" "$FILE_PATH/$R1_2" > "$OUTPUT_DIR/${PREFIX}_R1_combined.fastq.gz"
-  cat "$FILE_PATH/$R2_1" "$FILE_PATH/$R2_2" > "$OUTPUT_DIR/${PREFIX}_R2_combined.fastq.gz"
+  echo "Enter the exact filenames for the $LABELS R1 files, space-separated:"
+  read -a R1_FILES
 
-  echo "Concatenation completed: $PREFIX"
+  echo "Enter the exact filenames for the $LABELS R2 files, space-separated:"
+  read -a R2_FILES
+
+  if [[ "${#R1_FILES[@]}" -ne "$LABELS" || "${#R2_FILES[@]}" -ne "$LABELS" ]]; then
+    echo "Number of files provided doesn't match number of labels. Skipping $SAMPLE_NAME." | tee -a "$LOG_FILE"
+    continue
+  fi
+
+  echo "Concatenating patient $SAMPLE_NAME..." | tee -a "$LOG_FILE"
+
+  R1_OUT="$OUTPUT_DIR/${SAMPLE_NAME}_R1_combined.fastq.gz"
+  R2_OUT="$OUTPUT_DIR/${SAMPLE_NAME}_R2_combined.fastq.gz"
+
+  for r1 in "${R1_FILES[@]}"; do
+    if [[ ! -f "$FILE_PATH/$r1" ]]; then
+      echo "Missing file: $r1. Skipping $SAMPLE_NAME." | tee -a "$LOG_FILE"
+      continue 2
+    fi
+    cat "$FILE_PATH/$r1" >> "$R1_OUT"
+  done
+
+  for r2 in "${R2_FILES[@]}"; do
+    if [[ ! -f "$FILE_PATH/$r2" ]]; then
+      echo "Missing file: $r2. Skipping $SAMPLE_NAME." | tee -a "$LOG_FILE"
+      continue 2
+    fi
+    cat "$FILE_PATH/$r2" >> "$R2_OUT"
+  done
+
+  echo "Done: $SAMPLE_NAME" | tee -a "$LOG_FILE"
 done
 
+END_TIME=$(date +%s)
+TOTAL_TIME=$((END_TIME - START_TIME))
+
 echo ""
-echo "All files were successfully concatenated."
-echo "Final files are located in: $OUTPUT_DIR"
+echo "All valid samples processed."
+echo "Check output directory: $OUTPUT_DIR"
+echo "Log saved to: $LOG_FILE"
+echo "Total time: $TOTAL_TIME seconds" | tee -a "$LOG_FILE"
+
 exec bash
